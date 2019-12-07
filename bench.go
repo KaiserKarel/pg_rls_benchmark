@@ -43,12 +43,22 @@ func Benchmark(b testing.B, cfg BenchConfig,  options ...Option)  {
 }
 
 func main()  {
-	Benchmark(testing.B{}, BenchConfig{
+
+	// shortConf :=  BenchConfig{
+	// 	NumUsers: 10,
+	// 	NumGroups: 1,
+	// 	NumObjects: 100,
+	// 	AvgGroupSize: 1,
+	// }
+
+	bigConf :=  BenchConfig{
 		NumUsers: 10000,
-		NumGroups: 1000,
+		NumGroups: 200,
 		NumObjects: 100000,
-		AvgGroupSize: 10000/1000,
-	},
+		AvgGroupSize: 10,
+	}
+
+	Benchmark(testing.B{}, bigConf,
 		PopulateUsers,
 		PopulateGroups,
 		StitchUsersToGroups,

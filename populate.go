@@ -7,11 +7,12 @@ import (
 	"github.com/brianvoe/gofakeit/v4"
 	"log"
 	"math/rand"
+	"github.com/lib/pq"
 )
 
 func PopulateUsers(ctx context.Context, config BenchConfig, tx *sql.Tx) error {
 	log.Print("populating users")
-	stmt, err := tx.Prepare("INSERT INTO users (username) VALUES ($1)")
+	stmt, err := tx.Prepare(pq.CopyIn("users", "username"))
 	if err != nil {
 		return err
 	}
@@ -27,13 +28,19 @@ func PopulateUsers(ctx context.Context, config BenchConfig, tx *sql.Tx) error {
 			checkpoint = i
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
 	fmt.Print("\n")
+	log.Print("finished populating users")
 	return nil
 }
 
 func PopulateGroups(ctx context.Context, config BenchConfig, tx *sql.Tx) error  {
 	log.Print("populating groups")
-	stmt, err := tx.Prepare("INSERT INTO groups (name) VALUES ($1)")
+	stmt, err := tx.Prepare(pq.CopyIn("groups", "name"))
 	if err != nil {
 		return err
 	}
@@ -45,13 +52,19 @@ func PopulateGroups(ctx context.Context, config BenchConfig, tx *sql.Tx) error  
 			return  err
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
 	fmt.Print("\n")
+	log.Print("finished populating groups")
 	return nil
 }
 
 func PopulateObjects(ctx context.Context, config BenchConfig, tx *sql.Tx) error {
 	log.Print("populating objects")
-	stmt, err := tx.Prepare("INSERT INTO objects (name) VALUES ($1)")
+	stmt, err := tx.Prepare(pq.CopyIn("objects", "name"))
 	if err != nil {
 		return err
 	}
@@ -63,7 +76,13 @@ func PopulateObjects(ctx context.Context, config BenchConfig, tx *sql.Tx) error 
 			return  err
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
 	fmt.Print("\n")
+	log.Print("finished populating objects")
 	return nil
 }
 
@@ -75,7 +94,12 @@ func GenerateRandomUserPermissions(ctx context.Context, config BenchConfig, tx *
 		return enums[rand.Intn(len(enums))]
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO object_user_permissions (user_id, object_id, level) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING")
+	_, err := tx.ExecContext(ctx, `CREATE TEMPORARY TABLE object_user_permissions_temp (user_id INTEGER, object_id INTEGER, level permission_level) ON COMMIT DROP`)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(pq.CopyIn("object_user_permissions_temp", "user_id", "object_id", "level"))
 	if err != nil {
 		return err
 	}
@@ -93,7 +117,18 @@ func GenerateRandomUserPermissions(ctx context.Context, config BenchConfig, tx *
 			}
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
+	_, err = tx.Exec("INSERT INTO object_user_permissions (user_id, object_id, level) SELECT  * FROM object_user_permissions_temp ON CONFLICT DO NOTHING")
+	if err != nil {
+		return err
+	}
+
 	fmt.Print("\n")
+	log.Print("finised user permission generation")
 	return  nil
 }
 
@@ -105,7 +140,12 @@ func GenerateRandomGroupPermissions(ctx context.Context, config BenchConfig, tx 
 		return enums[rand.Intn(len(enums))]
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO object_group_permissions (group_id, object_id, level) VALUES ($1, $2, $3) ON CONFLICT  DO NOTHING")
+	_, err := tx.ExecContext(ctx, `CREATE TEMPORARY TABLE object_group_permissions_temp (group_id INTEGER, object_id INTEGER, level permission_level) ON COMMIT DROP;`)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(pq.CopyIn("object_group_permissions_temp", "group_id", "object_id", "level"))
 	if err != nil {
 		return err
 	}
@@ -123,13 +163,24 @@ func GenerateRandomGroupPermissions(ctx context.Context, config BenchConfig, tx 
 			}
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
+	_, err = tx.Exec("INSERT INTO object_group_permissions (group_id, object_id, level) SELECT  * FROM object_group_permissions_temp ON CONFLICT DO NOTHING")
+	if err != nil {
+		return err
+	}
+
 	fmt.Print("\n")
+	log.Print("starting group permission generation")
 	return  nil
 }
 
 func StitchUsersToGroups(ctx context.Context, config BenchConfig, tx *sql.Tx) error {
 	log.Print("starting user to group stitching")
-	stmt, err := tx.Prepare("INSERT INTO users_groups (user_id, group_id) VALUES ($1, $2)")
+	stmt, err := tx.Prepare(pq.CopyIn("users_groups", "user_id", "group_id"))
 	if err != nil {
 		return err
 	}
@@ -146,8 +197,18 @@ func StitchUsersToGroups(ctx context.Context, config BenchConfig, tx *sql.Tx) er
 		if currentGroupSize > config.AvgGroupSize {
 			groupID++
 			currentGroupSize = 0
+
+			if groupID > config.NumGroups {
+				groupID = 1
+			}
 		}
 	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return  err
+	}
+
 	fmt.Print("\n")
+	log.Print("finished stitching users to groups")
 	return nil
 }

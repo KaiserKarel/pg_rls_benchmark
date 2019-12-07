@@ -11,13 +11,16 @@ import (
 
 func Initialize(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return  fmt.Errorf("unable to load migrate driver: %w", err)
+	}
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
 		"postgres",
 		driver,
 		)
 	if err != nil {
-		return  fmt.Errorf("unable to load migrate driver: %w", err)
+		return  fmt.Errorf("unable to load instance driver: %w", err)
 	}
 	return(m.Up())
 }
