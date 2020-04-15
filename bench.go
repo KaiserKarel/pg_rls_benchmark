@@ -52,10 +52,10 @@ func main()  {
 	// }
 
 	bigConf :=  BenchConfig{
-		NumUsers: 10000,
-		NumGroups: 200,
-		NumObjects: 100000,
-		AvgGroupSize: 10,
+		NumUsers: 10000000,
+		NumGroups: 200000,
+		NumObjects: 100000000,
+		AvgGroupSize: 100,
 	}
 
 	Benchmark(testing.B{}, bigConf,
